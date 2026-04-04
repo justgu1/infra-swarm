@@ -60,7 +60,7 @@ services:
       POSTGRES_DATABASE: chatwoot_justgui
 
       # Redis
-      REDIS_URL: redis://comms_redis:6379
+      REDIS_URL: redis://comms_redis:6379/0
 
       # SMTP
       SMTP_DOMAIN: ${DOMAIN_JUSTGUI}
@@ -108,7 +108,7 @@ services:
       POSTGRES_USERNAME: ${COMMS_POSTGRES_USER}
       POSTGRES_PASSWORD: ${COMMS_POSTGRES_PASSWORD}
       POSTGRES_DATABASE: chatwoot_justgui
-      REDIS_URL: redis://comms_redis:6379
+      REDIS_URL: redis://comms_redis:6379/0
       SMTP_ADDRESS: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
       SMTP_SSL: "true"
@@ -143,7 +143,7 @@ services:
       POSTGRES_PASSWORD: ${COMMS_POSTGRES_PASSWORD}
       POSTGRES_DATABASE: chatwoot_tyershop
 
-      REDIS_URL: redis://comms_redis:6379
+      REDIS_URL: redis://comms_redis:6379/1
 
       SMTP_DOMAIN: tyershop.com
       SMTP_ADDRESS: ${SMTP_HOST}
@@ -189,7 +189,7 @@ services:
       POSTGRES_USERNAME: ${COMMS_POSTGRES_USER}
       POSTGRES_PASSWORD: ${COMMS_POSTGRES_PASSWORD}
       POSTGRES_DATABASE: chatwoot_tyershop
-      REDIS_URL: redis://comms_redis:6379
+      REDIS_URL: redis://comms_redis:6379/1
       SMTP_ADDRESS: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
       SMTP_SSL: "true"
