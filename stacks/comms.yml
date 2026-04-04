@@ -117,6 +117,14 @@ services:
       SMTP_PASSWORD: ${SMTP_JUSTGUI_PASSWORD}
       MAILER_SENDER_EMAIL: ${SMTP_JUSTGUI_USER}
       FRONTEND_URL: ${URL_SUPPORT}
+      ACTIVE_STORAGE_SERVICE: amazon
+      S3_BUCKET_NAME: support
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_REGION: us-east-1
+      AWS_ENDPOINT: ${URL_MINIO}
+      FORCE_PATH_STYLE: "true"
+      STORAGE_FORCE_PATH_STYLE: "true"
       TZ: America/Sao_Paulo
     depends_on:
       - postgres
@@ -201,6 +209,14 @@ services:
       SMTP_PASSWORD: ${SMTP_TYERSHOP_PASSWORD}
       MAILER_SENDER_EMAIL: ${SMTP_TYERSHOP_USER}
       FRONTEND_URL: ${URL_SUPPORT_TYERSHOP}
+      ACTIVE_STORAGE_SERVICE: amazon
+      S3_BUCKET_NAME: tyershop-support
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_REGION: us-east-1
+      AWS_ENDPOINT: ${URL_MINIO}
+      FORCE_PATH_STYLE: "true"
+      STORAGE_FORCE_PATH_STYLE: "true"
       TZ: America/Sao_Paulo
     depends_on:
       - postgres
