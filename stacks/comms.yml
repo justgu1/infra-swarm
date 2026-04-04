@@ -48,7 +48,7 @@ services:
       SECRET_KEY_BASE: ${CHATWOOT_SECRET_KEY_BASE}
       FRONTEND_URL: ${URL_SUPPORT}
       DEFAULT_LOCALE: pt_BR
-      FORCE_SSL: "true"
+      FORCE_SSL: "false"
       ENABLE_ACCOUNT_SIGNUP: "false"
       RAILS_ENV: production
       INSTALLATION_ENV: docker
@@ -133,7 +133,7 @@ services:
       SECRET_KEY_BASE: ${CHATWOOT_TYERSHOP_SECRET_KEY_BASE}
       FRONTEND_URL: ${URL_SUPPORT_TYERSHOP}
       DEFAULT_LOCALE: pt_BR
-      FORCE_SSL: "true"
+      FORCE_SSL: "false"
       ENABLE_ACCOUNT_SIGNUP: "false"
       RAILS_ENV: production
       INSTALLATION_ENV: docker
