@@ -70,9 +70,10 @@ done
 # Baixar parâmetros DH e opções SSL recomendadas
 echo "  → Baixando configurações SSL recomendadas..."
 docker run --rm \
+  --entrypoint sh \
   -v certbot_certs:/etc/letsencrypt \
   certbot/certbot \
-  sh -c "
+  -c "
     curl -s https://raw.githubusercontent.com/certbot/certbot/master/certbot-nginx/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf \
       -o /etc/letsencrypt/options-ssl-nginx.conf;
     openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048 2>/dev/null;
