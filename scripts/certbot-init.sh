@@ -7,7 +7,7 @@
 
 set -euo pipefail
 
-DEPLOY_PATH="/opt/infra"
+DEPLOY_PATH="/opt/infra-swarm"
 
 # Carregar variáveis
 source "$DEPLOY_PATH/.env"

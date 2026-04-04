@@ -87,13 +87,13 @@ O script faz automaticamente:
 - Inicializa o Docker Swarm com o IP público da VPS
 - Cria as redes overlay `proxy` e `internal`
 - Cria os volumes do Certbot (`certbot_certs`, `certbot_www`)
-- Clona o repositório em `/opt/infra`
+- Clona o repositório em `/opt/infra-swarm`
 - Configura o firewall (portas 22, 80, 443)
 
 ### 2. Configurar variáveis de ambiente
 
 ```bash
-cd /opt/infra
+cd /opt/infra-swarm
 cp .env.example .env
 nano .env   # preencha todos os valores marcados com "changeme"
 ```
@@ -160,7 +160,7 @@ Domínios locais usam o sufixo `.test` e são resolvidos via `/etc/hosts`.
 ## Atualizar um stack em produção
 
 ```bash
-cd /opt/infra
+cd /opt/infra-swarm
 git pull
 bash scripts/deploy-stack.sh <nome-do-stack>
 ```
@@ -176,7 +176,7 @@ O Docker Swarm faz rolling update sem downtime nos serviços com réplicas > 1.
 3. Execute o bootstrap no novo servidor
 4. Copie o `.env` do servidor anterior (nunca via git):
    ```bash
-   scp usuario@servidor-antigo:/opt/infra/.env /opt/infra/.env
+   scp usuario@servidor-antigo:/opt/infra-swarm/.env /opt/infra-swarm/.env
    ```
 5. Restaure os volumes com dados persistentes (PostgreSQL, MinIO):
    ```bash

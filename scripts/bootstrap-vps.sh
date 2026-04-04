@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-DEPLOY_PATH="/opt/infra"
+DEPLOY_PATH="/opt/infra-swam"
 REPO_URL="git@github.com:justgu1/infra-swam.git"
 
 echo "======================================"
