@@ -44,11 +44,16 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     entrypoint: >
       /bin/sh -c "
-        sleep 10;
-        mc alias set local http://storage_minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
+        echo 'Aguardando MinIO...';
+        for i in \$(seq 1 12); do
+          mc alias set local http://storage_minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD} && break;
+          echo 'Tentativa '$${i}' falhou, aguardando 10s...';
+          sleep 10;
+        done;
         mc mb --ignore-existing local/hericarealtor;
         mc mb --ignore-existing local/support;
         mc mb --ignore-existing local/justgui;
+        mc mb --ignore-existing local/tyershop-support;
         echo 'Buckets criados.';
         exit 0;
       "
