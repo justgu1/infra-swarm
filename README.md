@@ -1,92 +1,129 @@
-# justgu1 — Infraestrutura
+# infra — justgu1
 
-Monorepo de infraestrutura Docker Swarm para os projetos justgu1.
+Infraestrutura Docker Swarm para os projetos justgu1. Um único repo que centraliza stacks, configs de Nginx, scripts de deploy e ambiente local.
 
-## Domínios
+---
 
-| Domínio | Serviço | Stack |
+## Projetos hospedados
+
+| Projeto | Descrição | Stack |
 |---|---|---|
-| `hericarealtor.com` | App | `hericarealtor` |
-| `justgui.dev` | App | `justgui` |
-| `n8n.justgui.dev` | Automações | `automation` |
-| `minio.justgui.dev` | MinIO S3 API | `storage` |
-| `minio-console.justgui.dev` | MinIO Console | `storage` |
-| `support.justgui.dev` | Chatwoot | `comms` |
-| `evolution.justgui.dev` | Evolution API | `comms` |
+| **hericarealtor** | Plataforma imobiliária — Laravel + scraper de listagens | `hericarealtor` |
+| **justgui.dev** | Site pessoal/portfólio — Go API + Astro | `justgui` |
 
-## Estrutura
+### Serviços de suporte
+
+| Serviço | Função | Stack |
+|---|---|---|
+| Nginx + Certbot | Reverse proxy centralizado + SSL automático | `core` |
+| Portainer | Gerenciamento visual do Swarm | `portainer` |
+| MinIO | Object storage S3-compatível (imagens, arquivos) | `storage` |
+| n8n | Automações e webhooks | `automation` |
+| Chatwoot | Suporte ao cliente (chat/email) | `comms` |
+| Evolution API | Integração WhatsApp (via Chatwoot) | `comms` |
+
+---
+
+## Estrutura do repositório
 
 ```
-justgu1/
-├── apps/                  ← gitignored — clone os repos aqui manualmente
-├── infra/
-│   └── core/
-│       └── nginx/
-│           ├── nginx.conf
-│           └── conf.d/    ← um .conf por domínio
-├── stacks/                ← Docker Stack files (Swarm)
-│   ├── core.yml           ← Nginx + Certbot
-│   ├── storage.yml        ← MinIO
-│   ├── automation.yml     ← n8n
-│   ├── comms.yml          ← Chatwoot + Evolution API
-│   ├── hericarealtor.yml  ← Laravel Octane + PostgreSQL + Redis
-│   └── justgui.yml        ← Go API + Astro
-└── scripts/
-    ├── bootstrap-vps.sh   ← passo 1: instala tudo na VPS
-    ├── certbot-init.sh    ← passo 2: emite certificados SSL
-    └── deploy-stack.sh    ← passo 3: sobe os stacks
+infra/
+├── core/
+│   ├── nginx/
+│   │   ├── nginx.conf          ← configuração base do Nginx
+│   │   └── conf.d/             ← um arquivo .conf por domínio
+│   └── wwp-updater/            ← serviço auxiliar WhatsApp version updater
+├── local/
+│   ├── docker-compose.yml      ← ambiente local completo
+│   ├── nginx/conf.d/           ← confs Nginx para domínios .test
+│   ├── setup-hosts.sh          ← adiciona entradas /etc/hosts
+│   └── dev.sh                  ← atalhos para o ambiente local
+├── stacks/
+│   ├── core.yml                ← Nginx + Certbot
+│   ├── portainer.yml           ← Portainer
+│   ├── storage.yml             ← MinIO
+│   ├── automation.yml          ← n8n
+│   ├── comms.yml               ← Chatwoot + Evolution API
+│   ├── hericarealtor.yml       ← Laravel PHP-FPM + PostgreSQL + Redis
+│   └── justgui.yml             ← Go API + Astro
+├── scripts/
+│   ├── bootstrap-vps.sh        ← passo 1: prepara a VPS do zero
+│   ├── certbot-init.sh         ← passo 2: emite certificados SSL
+│   └── deploy-stack.sh         ← passo 3: sobe um ou todos os stacks
+├── .env.example                ← template de variáveis (sem valores reais)
+└── .gitignore                  ← exclui .env, apps/ e arquivos de SO
 ```
 
-## Redes overlay
+### Redes overlay (Swarm)
 
 | Rede | Uso |
 |---|---|
-| `proxy` | Nginx → todos os serviços expostos |
-| `internal` | Comunicação interna (DBs, Redis, etc.) |
+| `proxy` | Nginx → todos os serviços com porta exposta |
+| `internal` | Comunicação interna entre serviços (DBs, Redis) |
 
-## Stacks e serviços
+---
 
-### `core` — Nginx + Certbot
-- Nginx como reverse proxy centralizado (1 conf por domínio)
-- Certbot com renovação automática a cada 12h
+## Pré-requisitos
 
-### `storage` — MinIO
-- Buckets criados automaticamente: `hericarealtor`, `support`, `justgui`
-- API: `minio.justgui.dev` | Console: `minio-console.justgui.dev`
+- VPS com Ubuntu 22.04+ e acesso root via SSH
+- Chave SSH configurada no servidor
+- DNS dos domínios apontando para o IP da VPS **antes** de emitir certificados
 
-### `automation` — n8n
-- SMTP configurado via variáveis de ambiente
+---
 
-### `comms` — Chatwoot + Evolution API
-- Chatwoot com PostgreSQL e Redis próprios
-- Evolution API integrado ao MinIO e Redis do Chatwoot
-- SMTP para e-mails transacionais
+## Deploy inicial na VPS
 
-### `hericarealtor` — Laravel Octane
-- Octane com Swoole (porta 8000)
-- PostgreSQL + Redis próprios
-- Queue worker separado
-- APP_KEY gerado com `php artisan key:generate --show`
+### 1. Bootstrap
 
-### `justgui` — Go API + Astro
-- API Go na porta 8080 (`/api/*`)
-- Frontend Astro na porta 4321
-
-## Setup inicial na VPS
+Conecte na VPS e execute:
 
 ```bash
-# 1. Bootstrap (Docker, Swarm, redes, clone do repo)
-bash <(curl -fsSL https://raw.githubusercontent.com/justgu1/justgu1/main/scripts/bootstrap-vps.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/justgu1/infra/main/scripts/bootstrap-vps.sh)
+```
 
-# 2. Preencher variáveis (copiar .env.example → .env e ajustar)
-cp .env.example .env && nano .env
+O script faz automaticamente:
+- Atualiza o sistema e instala dependências (`curl`, `git`, `ufw`)
+- Instala o Docker e habilita o serviço
+- Inicializa o Docker Swarm com o IP público da VPS
+- Cria as redes overlay `proxy` e `internal`
+- Cria os volumes do Certbot (`certbot_certs`, `certbot_www`)
+- Clona o repositório em `/opt/infra`
+- Configura o firewall (portas 22, 80, 443)
 
-# 3. Emitir certificados SSL (DNS deve estar apontando para a VPS)
+### 2. Configurar variáveis de ambiente
+
+```bash
+cd /opt/infra
+cp .env.example .env
+nano .env   # preencha todos os valores marcados com "changeme"
+```
+
+> ⚠️ **Nunca commite o `.env`** — ele está no `.gitignore` e contém segredos reais.
+> Use o `.env.example` como referência; ele só contém placeholders.
+
+### 3. Emitir certificados SSL
+
+> Pré-requisito: DNS já propagado para o IP da VPS.
+
+```bash
 bash scripts/certbot-init.sh
+```
 
-# 4. Deploy de todos os stacks
+O script:
+- Sobe um Nginx temporário para responder ao challenge HTTP-01
+- Emite certificados Let's Encrypt para todos os domínios configurados
+- Baixa as configurações SSL recomendadas (DH params, options-ssl-nginx.conf)
+- Remove o container temporário
+
+### 4. Subir todos os stacks
+
+```bash
 bash scripts/deploy-stack.sh
 ```
+
+Ordem de deploy: `core → portainer → storage → automation → comms → hericarealtor → justgui`
+
+---
 
 ## Deploy de stack individual
 
@@ -99,19 +136,105 @@ bash scripts/deploy-stack.sh hericarealtor
 bash scripts/deploy-stack.sh justgui
 ```
 
-## Adicionar nova app
+---
 
-1. Adicionar entrada DNS apontando para a VPS
-2. Criar `infra/core/nginx/conf.d/novoapp.conf`
-3. Criar `stacks/novoapp.yml`
-4. Adicionar domínio em `scripts/certbot-init.sh`
-5. Adicionar URL vars em `.env`
-6. Deploy: `bash scripts/deploy-stack.sh novoapp`
+## Ambiente local (desenvolvimento)
+
+```bash
+cd local
+
+# 1. Adicionar entradas no /etc/hosts (apenas na primeira vez)
+bash setup-hosts.sh
+
+# 2. Ajustar variáveis locais
+cp .env.local.example .env.local  # ou edite o .env.local existente
+
+# 3. Subir o ambiente
+docker compose up -d
+```
+
+Domínios locais usam o sufixo `.test` e são resolvidos via `/etc/hosts`.
+
+---
+
+## Atualizar um stack em produção
+
+```bash
+cd /opt/infra
+git pull
+bash scripts/deploy-stack.sh <nome-do-stack>
+```
+
+O Docker Swarm faz rolling update sem downtime nos serviços com réplicas > 1.
+
+---
+
+## Migrar para outro servidor
+
+1. Provisione a nova VPS com o mesmo OS
+2. Aponte o DNS para o novo IP (mantenha o antigo no ar durante a transição)
+3. Execute o bootstrap no novo servidor
+4. Copie o `.env` do servidor anterior (nunca via git):
+   ```bash
+   scp usuario@servidor-antigo:/opt/infra/.env /opt/infra/.env
+   ```
+5. Restaure os volumes com dados persistentes (PostgreSQL, MinIO):
+   ```bash
+   # Exemplo para PostgreSQL — adapte por stack
+   docker exec <container_db> pg_dumpall -U <usuario> > backup.sql
+   # No novo servidor:
+   docker exec -i <container_db_novo> psql -U <usuario> < backup.sql
+   ```
+6. Emita novos certificados SSL: `bash scripts/certbot-init.sh`
+7. Suba os stacks: `bash scripts/deploy-stack.sh`
+8. Valide e redirecione o DNS
+
+---
+
+## Escalar um serviço
+
+```bash
+# Escalar o worker do hericarealtor para 3 réplicas
+docker service scale hericarealtor_worker=3
+
+# Verificar réplicas ativas
+docker service ls
+docker service ps hericarealtor_worker
+```
+
+Para tornar permanente, ajuste `deploy.replicas` no stack `.yml` e faça redeploy.
+
+---
+
+## Adicionar um novo projeto
+
+1. Criar entrada DNS apontando para a VPS
+2. Criar `core/nginx/conf.d/novoprojeto.conf` (use um conf existente como modelo)
+3. Criar `stacks/novoprojeto.yml`
+4. Adicionar os domínios em `scripts/certbot-init.sh`
+5. Adicionar as variáveis necessárias em `.env.example` (sem valores reais)
+6. Commit e push
+7. Na VPS: `git pull && bash scripts/deploy-stack.sh novoprojeto`
+
+---
+
+## Segurança
+
+- **`.env` nunca vai ao git** — está no `.gitignore`. Use `.env.example` com placeholders.
+- **Segredos em produção** gerenciados exclusivamente via `.env` no servidor, fora do repositório.
+- **Firewall (UFW)** habilitado pelo bootstrap: apenas portas 22, 80 e 443 abertas.
+- **SSL automático** via Certbot/Let's Encrypt com renovação a cada 12h.
+- **Redes internas** (`internal`) isolam bancos de dados e Redis — nunca expostos ao `proxy`.
+- **Portainer** restrito por senha e acessível apenas via HTTPS.
+- Rotacione segredos periodicamente e nunca os compartilhe em issues, PRs ou logs.
+
+---
 
 ## Apps (repos externos)
 
+Os repos de aplicação são clonados manualmente na pasta `apps/` (gitignored):
+
 ```bash
-# Clone manual em apps/ (pasta gitignored)
 git clone git@github.com:justgu1/hericarealtor.git apps/hericarealtor
-git clone git@github.com:justgu1/justgui.dev.git apps/justgui
+git clone git@github.com:justgu1/justgui.dev.git   apps/justgui
 ```
