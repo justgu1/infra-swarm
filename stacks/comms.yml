@@ -13,7 +13,7 @@ services:
     environment:
       POSTGRES_USER: ${COMMS_POSTGRES_USER}
       POSTGRES_PASSWORD: ${COMMS_POSTGRES_PASSWORD}
-      POSTGRES_DB: chatwoot_production
+      POSTGRES_DB: chatwoot_justgui
     volumes:
       - comms_postgres:/var/lib/postgresql/data
       - ${DEPLOY_PATH}/stacks/comms-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -57,7 +57,7 @@ services:
       POSTGRES_HOST: comms_postgres
       POSTGRES_USERNAME: ${COMMS_POSTGRES_USER}
       POSTGRES_PASSWORD: ${COMMS_POSTGRES_PASSWORD}
-      POSTGRES_DATABASE: chatwoot_production
+      POSTGRES_DATABASE: chatwoot_justgui
 
       # Redis
       REDIS_URL: redis://comms_redis:6379
@@ -107,7 +107,7 @@ services:
       POSTGRES_HOST: comms_postgres
       POSTGRES_USERNAME: ${COMMS_POSTGRES_USER}
       POSTGRES_PASSWORD: ${COMMS_POSTGRES_PASSWORD}
-      POSTGRES_DATABASE: chatwoot_production
+      POSTGRES_DATABASE: chatwoot_justgui
       REDIS_URL: redis://comms_redis:6379
       SMTP_ADDRESS: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
