@@ -114,6 +114,7 @@ services:
       SMTP_SSL: "true"
       SMTP_USERNAME: ${SMTP_JUSTGUI_USER}
       SMTP_PASSWORD: ${SMTP_JUSTGUI_PASSWORD}
+      MAILER_SENDER_EMAIL: ${SMTP_JUSTGUI_USER}
       FRONTEND_URL: ${URL_SUPPORT}
       TZ: America/Sao_Paulo
     depends_on:
@@ -196,6 +197,7 @@ services:
       SMTP_SSL: "true"
       SMTP_USERNAME: ${SMTP_TYERSHOP_USER}
       SMTP_PASSWORD: ${SMTP_TYERSHOP_PASSWORD}
+      MAILER_SENDER_EMAIL: ${SMTP_TYERSHOP_USER}
       FRONTEND_URL: ${URL_SUPPORT_TYERSHOP}
       TZ: America/Sao_Paulo
     depends_on:
