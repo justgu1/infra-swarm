@@ -208,7 +208,7 @@ services:
 
   # ─── Evolution API ──────────────────────────────────────────────────────────
   evolution:
-    image: atendai/evolution-api:v2.3.7
+    image: atendai/evolution-api:2.3.7
     environment:
       SERVER_URL: ${URL_EVOLUTION}
       AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
