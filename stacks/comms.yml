@@ -233,6 +233,9 @@ services:
       CACHE_REDIS_URI: redis://comms_redis:6379/6
       CACHE_REDIS_PREFIX_KEY: ${EVOLUTION_REDIS_PREFIX:-evolution}
 
+      # Chatwoot integration
+      CHATWOOT_ENABLED: "true"
+
       TZ: America/Sao_Paulo
     volumes:
       - evolution_instances:/evolution/instances
