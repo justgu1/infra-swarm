@@ -6,7 +6,7 @@
 set -euo pipefail
 
 DEPLOY_PATH="/opt/infra"
-REPO_URL="git@github.com:justgu1/infra.git"
+REPO_URL="git@github.com:justgu1/infra-swam.git"
 
 echo "======================================"
 echo " Bootstrap VPS — justgu1 infra"
