@@ -80,6 +80,7 @@ services:
       AWS_REGION: us-east-1
       AWS_ENDPOINT: ${URL_MINIO}
       FORCE_PATH_STYLE: "true"
+      STORAGE_FORCE_PATH_STYLE: "true"
 
       TZ: America/Sao_Paulo
     depends_on:
@@ -163,6 +164,7 @@ services:
       AWS_REGION: us-east-1
       AWS_ENDPOINT: ${URL_MINIO}
       FORCE_PATH_STYLE: "true"
+      STORAGE_FORCE_PATH_STYLE: "true"
 
       TZ: America/Sao_Paulo
     depends_on:
