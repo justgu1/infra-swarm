@@ -1,0 +1,286 @@
+version: '3.8'
+
+# Stack: comms
+# Serviços: Chatwoot + Evolution API + WhatsApp Version Updater + PostgreSQL + Redis
+# Baseado em: chatwoot-evolution-wwp-automation
+# Deploy: docker stack deploy -c stacks/comms.yml comms
+
+services:
+  # ─── PostgreSQL ─────────────────────────────────────────────────────────────
+  # Um único postgres com dois bancos (chatwoot + evolution)
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${COMMS_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${COMMS_POSTGRES_PASSWORD}
+      POSTGRES_DB: chatwoot_production
+    volumes:
+      - comms_postgres:/var/lib/postgresql/data
+      - ${DEPLOY_PATH}/stacks/comms-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - internal
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+  # ─── Redis ──────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - comms_redis:/data
+    networks:
+      - internal
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  # ─── Chatwoot Rails ─────────────────────────────────────────────────────────
+  chatwoot:
+    image: chatwoot/chatwoot:v4.11.2
+    command: sh -c "bundle exec rails db:chatwoot_prepare && bundle exec rails s -p 3000 -b 0.0.0.0"
+    environment:
+      SECRET_KEY_BASE: ${CHATWOOT_SECRET_KEY_BASE}
+      FRONTEND_URL: ${URL_SUPPORT}
+      DEFAULT_LOCALE: pt_BR
+      FORCE_SSL: "true"
+      ENABLE_ACCOUNT_SIGNUP: "false"
+      RAILS_ENV: production
+      INSTALLATION_ENV: docker
+
+      # Banco
+      POSTGRES_HOST: comms_postgres
+      POSTGRES_USERNAME: ${COMMS_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${COMMS_POSTGRES_PASSWORD}
+      POSTGRES_DATABASE: chatwoot_production
+
+      # Redis
+      REDIS_URL: redis://comms_redis:6379
+
+      # SMTP
+      SMTP_DOMAIN: ${DOMAIN_JUSTGUI}
+      SMTP_ADDRESS: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_SSL: "true"
+      SMTP_USERNAME: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_AUTHENTICATION: login
+      MAILER_SENDER_EMAIL: ${SMTP_USER}
+
+      # Storage (MinIO)
+      ACTIVE_STORAGE_SERVICE: amazon
+      S3_BUCKET_NAME: support
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_REGION: us-east-1
+      AWS_ENDPOINT: ${URL_MINIO}
+      FORCE_PATH_STYLE: "true"
+
+      TZ: America/Sao_Paulo
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - proxy
+      - internal
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+
+  # ─── Chatwoot Sidekiq ───────────────────────────────────────────────────────
+  sidekiq:
+    image: chatwoot/chatwoot:v4.11.2
+    command: bundle exec sidekiq -C config/sidekiq.yml
+    environment:
+      SECRET_KEY_BASE: ${CHATWOOT_SECRET_KEY_BASE}
+      RAILS_ENV: production
+      POSTGRES_HOST: comms_postgres
+      POSTGRES_USERNAME: ${COMMS_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${COMMS_POSTGRES_PASSWORD}
+      POSTGRES_DATABASE: chatwoot_production
+      REDIS_URL: redis://comms_redis:6379
+      SMTP_ADDRESS: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_SSL: "true"
+      SMTP_USERNAME: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      TZ: America/Sao_Paulo
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - internal
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  # ─── Chatwoot Tyershop Rails ─────────────────────────────────────────────────
+  chatwoot_tyershop:
+    image: chatwoot/chatwoot:v4.11.2
+    command: sh -c "bundle exec rails db:chatwoot_prepare && bundle exec rails s -p 3000 -b 0.0.0.0"
+    environment:
+      SECRET_KEY_BASE: ${CHATWOOT_TYERSHOP_SECRET_KEY_BASE}
+      FRONTEND_URL: ${URL_SUPPORT_TYERSHOP}
+      DEFAULT_LOCALE: pt_BR
+      FORCE_SSL: "true"
+      ENABLE_ACCOUNT_SIGNUP: "false"
+      RAILS_ENV: production
+      INSTALLATION_ENV: docker
+
+      POSTGRES_HOST: comms_postgres
+      POSTGRES_USERNAME: ${COMMS_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${COMMS_POSTGRES_PASSWORD}
+      POSTGRES_DATABASE: chatwoot_tyershop
+
+      REDIS_URL: redis://comms_redis:6379
+
+      SMTP_DOMAIN: tyershop.com
+      SMTP_ADDRESS: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_SSL: "true"
+      SMTP_USERNAME: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_AUTHENTICATION: login
+      MAILER_SENDER_EMAIL: ${SMTP_USER}
+
+      ACTIVE_STORAGE_SERVICE: amazon
+      S3_BUCKET_NAME: tyershop-support
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_REGION: us-east-1
+      AWS_ENDPOINT: ${URL_MINIO}
+      FORCE_PATH_STYLE: "true"
+
+      TZ: America/Sao_Paulo
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - proxy
+      - internal
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+
+  # ─── Chatwoot Tyershop Sidekiq ───────────────────────────────────────────────
+  sidekiq_tyershop:
+    image: chatwoot/chatwoot:v4.11.2
+    command: bundle exec sidekiq -C config/sidekiq.yml
+    environment:
+      SECRET_KEY_BASE: ${CHATWOOT_TYERSHOP_SECRET_KEY_BASE}
+      RAILS_ENV: production
+      POSTGRES_HOST: comms_postgres
+      POSTGRES_USERNAME: ${COMMS_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${COMMS_POSTGRES_PASSWORD}
+      POSTGRES_DATABASE: chatwoot_tyershop
+      REDIS_URL: redis://comms_redis:6379
+      SMTP_ADDRESS: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_SSL: "true"
+      SMTP_USERNAME: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      TZ: America/Sao_Paulo
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - internal
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  # ─── Evolution API ──────────────────────────────────────────────────────────
+  evolution:
+    image: atendai/evolution-api:v2.3.7
+    environment:
+      SERVER_URL: ${URL_EVOLUTION}
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES: "true"
+
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://${COMMS_POSTGRES_USER}:${COMMS_POSTGRES_PASSWORD}@comms_postgres:5432/evolution?schema=public
+      DATABASE_CONNECTION_CLIENT_NAME: evolution
+
+
+      # Storage (MinIO)
+      S3_ENABLED: "true"
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: support
+      S3_PORT: 443
+      S3_ENDPOINT: ${URL_MINIO}
+      S3_USE_SSL: "true"
+
+      # Redis
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://comms_redis:6379/6
+      CACHE_REDIS_PREFIX_KEY: ${EVOLUTION_REDIS_PREFIX:-evolution}
+
+      TZ: America/Sao_Paulo
+    volumes:
+      - evolution_instances:/evolution/instances
+    networks:
+      - proxy
+      - internal
+    depends_on:
+      - postgres
+      - redis
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+
+  # ─── WhatsApp Version Updater ────────────────────────────────────────────────
+  # Roda todo dia 00:00 — scrapa versão atual do WA, atualiza Evolution via service update
+  wwp-updater:
+    image: ghcr.io/justgu1/wwp-updater:latest
+    environment:
+      EVOLUTION_SERVICE_NAME: comms_evolution
+      REDIS_CONTAINER: comms_redis
+      CACHE_REDIS_PREFIX_KEY: ${EVOLUTION_REDIS_PREFIX:-evolution}
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_WWP_RESULT}
+      TZ: America/Sao_Paulo
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - proxy
+      - internal
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+volumes:
+  comms_postgres:
+  comms_redis:
+  evolution_instances:
+
+networks:
+  proxy:
+    external: true
+  internal:
+    external: true

@@ -1,0 +1,442 @@
+services:
+  # ─── NGINX ──────────────────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ../core/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    networks:
+      - proxy
+    depends_on:
+      - mailpit
+
+  # ─── PORTAINER ──────────────────────────────────────────────────────────────
+  portainer:
+    image: portainer/portainer-ce:latest
+    command: -H unix:///var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    networks:
+      - proxy
+
+  # ─── MINIO ──────────────────────────────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BROWSER_REDIRECT_URL: ${URL_MINIO_CONSOLE}
+    volumes:
+      - minio_data:/data
+    networks:
+      - proxy
+      - internal
+
+  minio_init:
+    image: minio/mc:latest
+    networks:
+      - internal
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    entrypoint: >
+      /bin/sh -c "
+        sleep 8;
+        mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
+        mc mb --ignore-existing local/hericarealtor;
+        mc mb --ignore-existing local/support;
+        mc mb --ignore-existing local/tyershop-support;
+        mc mb --ignore-existing local/justgui;
+        exit 0;
+      "
+    depends_on:
+      - minio
+
+  # ─── N8N ────────────────────────────────────────────────────────────────────
+  n8n:
+    image: n8nio/n8n:latest
+    environment:
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_HOST: ${URL_N8N}
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      WEBHOOK_URL: ${URL_N8N}
+      N8N_EMAIL_MODE: smtp
+      N8N_SMTP_HOST: ${SMTP_HOST}
+      N8N_SMTP_PORT: ${SMTP_PORT}
+      N8N_SMTP_SSL: "false"
+      N8N_SMTP_USER: ${SMTP_USER}
+      N8N_SMTP_PASS: ${SMTP_PASSWORD}
+      N8N_SECURE_COOKIE: "false"
+      GENERIC_TIMEZONE: America/Sao_Paulo
+      TZ: America/Sao_Paulo
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - proxy
+      - internal
+
+  # ─── COMMS: PostgreSQL compartilhado (chatwoot + evolution) ────────────────
+  comms_postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${COMMS_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${COMMS_POSTGRES_PASSWORD}
+      POSTGRES_DB: chatwoot_production
+    volumes:
+      - comms_postgres:/var/lib/postgresql/data
+      - ../stacks/comms-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - internal
+
+  comms_redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - comms_redis:/data
+    networks:
+      - internal
+
+  chatwoot:
+    image: chatwoot/chatwoot:v4.11.2
+    command: sh -c "bundle exec rails db:chatwoot_prepare && bundle exec rails s -p 3000 -b 0.0.0.0"
+    environment:
+      SECRET_KEY_BASE: ${CHATWOOT_SECRET_KEY_BASE}
+      FRONTEND_URL: ${URL_SUPPORT}
+      DEFAULT_LOCALE: pt_BR
+      FORCE_SSL: "false"
+      ENABLE_ACCOUNT_SIGNUP: "false"
+      RAILS_ENV: production
+      INSTALLATION_ENV: docker
+      POSTGRES_HOST: comms_postgres
+      POSTGRES_USERNAME: ${COMMS_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${COMMS_POSTGRES_PASSWORD}
+      POSTGRES_DATABASE: chatwoot_production
+      REDIS_URL: redis://comms_redis:6379
+      SMTP_DOMAIN: ${DOMAIN_JUSTGUI}
+      SMTP_ADDRESS: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_SSL: "false"
+      SMTP_USERNAME: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_AUTHENTICATION: plain
+      MAILER_SENDER_EMAIL: ${SMTP_USER}
+      ACTIVE_STORAGE_SERVICE: amazon
+      S3_BUCKET_NAME: support
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_REGION: us-east-1
+      AWS_ENDPOINT: ${URL_MINIO}
+      FORCE_PATH_STYLE: "true"
+      TZ: America/Sao_Paulo
+    depends_on:
+      - comms_postgres
+      - comms_redis
+    networks:
+      - proxy
+      - internal
+
+  sidekiq:
+    image: chatwoot/chatwoot:v4.11.2
+    command: bundle exec sidekiq -C config/sidekiq.yml
+    environment:
+      SECRET_KEY_BASE: ${CHATWOOT_SECRET_KEY_BASE}
+      RAILS_ENV: production
+      POSTGRES_HOST: comms_postgres
+      POSTGRES_USERNAME: ${COMMS_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${COMMS_POSTGRES_PASSWORD}
+      POSTGRES_DATABASE: chatwoot_production
+      REDIS_URL: redis://comms_redis:6379
+      SMTP_ADDRESS: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_SSL: "false"
+      SMTP_USERNAME: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      TZ: America/Sao_Paulo
+    depends_on:
+      - comms_postgres
+      - comms_redis
+    networks:
+      - internal
+
+  # ─── CHATWOOT TYERSHOP ──────────────────────────────────────────────────────
+  chatwoot_tyershop:
+    image: chatwoot/chatwoot:v4.11.2
+    command: sh -c "bundle exec rails db:chatwoot_prepare && bundle exec rails s -p 3000 -b 0.0.0.0"
+    environment:
+      SECRET_KEY_BASE: ${CHATWOOT_TYERSHOP_SECRET_KEY_BASE}
+      FRONTEND_URL: ${URL_SUPPORT_TYERSHOP}
+      DEFAULT_LOCALE: pt_BR
+      FORCE_SSL: "false"
+      ENABLE_ACCOUNT_SIGNUP: "false"
+      RAILS_ENV: production
+      INSTALLATION_ENV: docker
+      POSTGRES_HOST: comms_postgres
+      POSTGRES_USERNAME: ${COMMS_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${COMMS_POSTGRES_PASSWORD}
+      POSTGRES_DATABASE: chatwoot_tyershop
+      REDIS_URL: redis://comms_redis:6379
+      SMTP_DOMAIN: tyershop.com
+      SMTP_ADDRESS: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_SSL: "false"
+      SMTP_USERNAME: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_AUTHENTICATION: plain
+      MAILER_SENDER_EMAIL: ${SMTP_USER}
+      ACTIVE_STORAGE_SERVICE: amazon
+      S3_BUCKET_NAME: tyershop-support
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_REGION: us-east-1
+      AWS_ENDPOINT: ${URL_MINIO}
+      FORCE_PATH_STYLE: "true"
+      TZ: America/Sao_Paulo
+    depends_on:
+      - comms_postgres
+      - comms_redis
+    networks:
+      - proxy
+      - internal
+
+  sidekiq_tyershop:
+    image: chatwoot/chatwoot:v4.11.2
+    command: bundle exec sidekiq -C config/sidekiq.yml
+    environment:
+      SECRET_KEY_BASE: ${CHATWOOT_TYERSHOP_SECRET_KEY_BASE}
+      RAILS_ENV: production
+      POSTGRES_HOST: comms_postgres
+      POSTGRES_USERNAME: ${COMMS_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${COMMS_POSTGRES_PASSWORD}
+      POSTGRES_DATABASE: chatwoot_tyershop
+      REDIS_URL: redis://comms_redis:6379
+      SMTP_ADDRESS: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_SSL: "false"
+      SMTP_USERNAME: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      TZ: America/Sao_Paulo
+    depends_on:
+      - comms_postgres
+      - comms_redis
+    networks:
+      - internal
+
+  # ─── EVOLUTION API ──────────────────────────────────────────────────────────
+  evolution:
+    image: atendai/evolution-api:v2.3.7
+    environment:
+      SERVER_URL: ${URL_EVOLUTION}
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://${COMMS_POSTGRES_USER}:${COMMS_POSTGRES_PASSWORD}@comms_postgres:5432/evolution?schema=public
+      DATABASE_CONNECTION_CLIENT_NAME: evolution_local
+      S3_ENABLED: "true"
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: support
+      S3_PORT: 9000
+      S3_ENDPOINT: minio
+      S3_USE_SSL: "false"
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://comms_redis:6379/6
+      CACHE_REDIS_PREFIX_KEY: ${EVOLUTION_REDIS_PREFIX:-evolution}
+      TZ: America/Sao_Paulo
+    volumes:
+      - evolution_data:/evolution/instances
+    networks:
+      - proxy
+      - internal
+    depends_on:
+      - comms_postgres
+      - comms_redis
+
+  # ─── HERICAREALTOR ──────────────────────────────────────────────────────────
+  hericarealtor_postgres:
+    image: postgres:16-alpine
+    profiles: [hericarealtor]
+    environment:
+      POSTGRES_USER: ${HERICAREALTOR_DB_USER}
+      POSTGRES_PASSWORD: ${HERICAREALTOR_DB_PASSWORD}
+      POSTGRES_DB: ${HERICAREALTOR_DB_NAME}
+    volumes:
+      - hericarealtor_postgres:/var/lib/postgresql/data
+    networks:
+      - internal
+
+  hericarealtor_redis:
+    image: redis:7-alpine
+    profiles: [hericarealtor]
+    command: redis-server --appendonly yes
+    volumes:
+      - hericarealtor_redis:/data
+    networks:
+      - internal
+
+  hericarealtor_nginx:
+    image: nginx:1.27-alpine
+    profiles: [hericarealtor]
+    volumes:
+      - ./nginx/hericarealtor/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - /home/guilherme/justgu1/apps/hericarealtor:/var/www:ro
+    networks:
+      - proxy
+      - internal
+    depends_on:
+      - hericarealtor
+
+  hericarealtor_vite:
+    image: node:20-alpine
+    profiles: [hericarealtor]
+    working_dir: /app
+    command: sh -c "yarn install && yarn dev"
+    volumes:
+      - /home/guilherme/justgu1/apps/hericarealtor:/app
+      - hericarealtor_node_modules:/app/node_modules
+    environment:
+      VITE_HOST: hericarealtor.test
+    ports:
+      - "5173:5173"
+    networks:
+      - proxy
+
+  hericarealtor:
+    image: ghcr.io/justgu1/hericarealtor:${HERICAREALTOR_TAG:-latest}
+    profiles: [hericarealtor]
+    volumes:
+      - /home/guilherme/justgu1/apps/hericarealtor/public:/var/www/public
+    environment:
+      APP_ENV: local
+      APP_KEY: ${HERICAREALTOR_APP_KEY}
+      APP_URL: ${URL_HERICAREALTOR}
+      DB_CONNECTION: pgsql
+      DB_HOST: hericarealtor_postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${HERICAREALTOR_DB_NAME}
+      DB_USERNAME: ${HERICAREALTOR_DB_USER}
+      DB_PASSWORD: ${HERICAREALTOR_DB_PASSWORD}
+      REDIS_HOST: hericarealtor_redis
+      REDIS_PORT: 6379
+      CACHE_DRIVER: redis
+      SESSION_DRIVER: redis
+      QUEUE_CONNECTION: redis
+      MAIL_MAILER: smtp
+      MAIL_HOST: ${SMTP_HOST}
+      MAIL_PORT: ${SMTP_PORT}
+      MAIL_ENCRYPTION: null
+      MAIL_USERNAME: ${SMTP_USER}
+      MAIL_PASSWORD: ${SMTP_PASSWORD}
+      MAIL_FROM_ADDRESS: ${SMTP_USER}
+      MAIL_FROM_NAME: "Herica Realtor"
+      FILESYSTEM_DISK: s3
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_BUCKET: hericarealtor
+      AWS_ENDPOINT: ${URL_MINIO}
+      AWS_USE_PATH_STYLE_ENDPOINT: "true"
+      N8N_INTERNAL_TOKEN: ${HERICAREALTOR_INTERNAL_TOKEN}
+      OCTANE_SERVER: swoole
+      TZ: America/Sao_Paulo
+    networks:
+      - proxy
+      - internal
+    depends_on:
+      - hericarealtor_postgres
+      - hericarealtor_redis
+
+  hericarealtor_worker:
+    image: ghcr.io/justgu1/hericarealtor:${HERICAREALTOR_TAG:-latest}
+    profiles: [hericarealtor]
+    command: php artisan queue:work --sleep=3 --tries=3
+    environment:
+      APP_ENV: local
+      APP_KEY: ${HERICAREALTOR_APP_KEY}
+      DB_CONNECTION: pgsql
+      DB_HOST: hericarealtor_postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${HERICAREALTOR_DB_NAME}
+      DB_USERNAME: ${HERICAREALTOR_DB_USER}
+      DB_PASSWORD: ${HERICAREALTOR_DB_PASSWORD}
+      REDIS_HOST: hericarealtor_redis
+      QUEUE_CONNECTION: redis
+      TZ: America/Sao_Paulo
+    networks:
+      - internal
+    depends_on:
+      - hericarealtor_postgres
+      - hericarealtor_redis
+
+  listings_updater:
+    image: ghcr.io/justgu1/hericarealtor-listings-updater:${HERICAREALTOR_TAG:-latest}
+    profiles: [hericarealtor]
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql://${HERICAREALTOR_DB_USER}:${HERICAREALTOR_DB_PASSWORD}@hericarealtor_postgres:5432/${HERICAREALTOR_DB_NAME}
+      ZILLOW_ENCODED_ZUID: ${ZILLOW_ENCODED_ZUID}
+      ZILLOW_PROFILE_SLUG: ${ZILLOW_PROFILE_SLUG}
+      USE_VIRTUAL_DISPLAY: "true"
+      LARAVEL_API_URL: ${URL_HERICAREALTOR}
+      LARAVEL_INTERNAL_TOKEN: ${HERICAREALTOR_INTERNAL_TOKEN}
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_LISTINGS_RESULT}
+      TZ: America/Sao_Paulo
+    networks:
+      - proxy
+      - internal
+    depends_on:
+      - hericarealtor_postgres
+
+  # ─── JUSTGUI ────────────────────────────────────────────────────────────────
+  justgui_api:
+    image: ghcr.io/justgu1/justgui-api:${JUSTGUI_TAG:-latest}
+    profiles: [justgui]
+    environment:
+      PORT: 8080
+      ENV: local
+      TZ: America/Sao_Paulo
+    networks:
+      - proxy
+      - internal
+
+  justgui_web:
+    image: ghcr.io/justgu1/justgui-web:${JUSTGUI_TAG:-latest}
+    profiles: [justgui]
+    environment:
+      PORT: 4321
+      PUBLIC_API_URL: ${URL_JUSTGUI}/api
+      TZ: America/Sao_Paulo
+    networks:
+      - proxy
+
+  # ─── MAILPIT (SMTP local catch-all) ─────────────────────────────────────────
+  mailpit:
+    image: axllent/mailpit:latest
+    networks:
+      - proxy
+      - internal
+
+volumes:
+  minio_data:
+  n8n_data:
+  comms_postgres:
+  comms_redis:
+  evolution_data:
+  portainer_data:
+  hericarealtor_postgres:
+  hericarealtor_redis:
+  hericarealtor_node_modules:
+
+networks:
+  proxy:
+    driver: bridge
+  internal:
+    driver: bridge

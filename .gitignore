@@ -1,0 +1,11 @@
+# Apps são repos externos — clone manual em apps/
+apps/
+
+# Secrets
+.env
+*.env
+
+# OS
+.DS_Store
+Thumbs.db
+.env.local

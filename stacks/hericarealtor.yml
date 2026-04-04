@@ -1,0 +1,157 @@
+version: '3.8'
+
+# Stack: hericarealtor
+# Serviços: Laravel Octane (Swoole) + PostgreSQL + Redis
+# Imagem: ghcr.io/justgu1/hericarealtor:latest
+# Deploy: docker stack deploy -c stacks/hericarealtor.yml hericarealtor
+
+services:
+  app:
+    image: ghcr.io/justgu1/hericarealtor:${HERICAREALTOR_TAG:-latest}
+    environment:
+      APP_ENV: production
+      # APP_KEY gerado com: php artisan key:generate --show
+      APP_KEY: ${HERICAREALTOR_APP_KEY}
+      APP_URL: ${URL_HERICAREALTOR}
+
+      # Database (PostgreSQL)
+      DB_CONNECTION: pgsql
+      DB_HOST: hericarealtor_postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${HERICAREALTOR_DB_NAME}
+      DB_USERNAME: ${HERICAREALTOR_DB_USER}
+      DB_PASSWORD: ${HERICAREALTOR_DB_PASSWORD}
+
+      # Redis (cache, sessões, filas)
+      REDIS_HOST: hericarealtor_redis
+      REDIS_PORT: 6379
+      CACHE_DRIVER: redis
+      SESSION_DRIVER: redis
+      QUEUE_CONNECTION: redis
+
+      # SMTP
+      MAIL_MAILER: smtp
+      MAIL_HOST: ${SMTP_HOST}
+      MAIL_PORT: ${SMTP_PORT}
+      MAIL_ENCRYPTION: ssl
+      MAIL_USERNAME: ${SMTP_USER}
+      MAIL_PASSWORD: ${SMTP_PASSWORD}
+      MAIL_FROM_ADDRESS: ${SMTP_USER}
+      MAIL_FROM_NAME: "Herica Realtor"
+
+      # Storage (MinIO)
+      FILESYSTEM_DISK: s3
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_BUCKET: hericarealtor
+      AWS_ENDPOINT: ${URL_MINIO}
+      AWS_USE_PATH_STYLE_ENDPOINT: "true"
+
+      # Octane
+      OCTANE_SERVER: swoole
+
+      TZ: America/Sao_Paulo
+    networks:
+      - proxy
+      - internal
+    depends_on:
+      - postgres
+      - redis
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${HERICAREALTOR_DB_USER}
+      POSTGRES_PASSWORD: ${HERICAREALTOR_DB_PASSWORD}
+      POSTGRES_DB: ${HERICAREALTOR_DB_NAME}
+    volumes:
+      - hericarealtor_postgres:/var/lib/postgresql/data
+    networks:
+      - internal
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - hericarealtor_redis:/data
+    networks:
+      - internal
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  worker:
+    image: ghcr.io/justgu1/hericarealtor:${HERICAREALTOR_TAG:-latest}
+    command: php artisan queue:work --sleep=3 --tries=3 --max-time=3600
+    environment:
+      APP_ENV: production
+      APP_KEY: ${HERICAREALTOR_APP_KEY}
+      DB_CONNECTION: pgsql
+      DB_HOST: hericarealtor_postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${HERICAREALTOR_DB_NAME}
+      DB_USERNAME: ${HERICAREALTOR_DB_USER}
+      DB_PASSWORD: ${HERICAREALTOR_DB_PASSWORD}
+      REDIS_HOST: hericarealtor_redis
+      QUEUE_CONNECTION: redis
+      TZ: America/Sao_Paulo
+    networks:
+      - internal
+    depends_on:
+      - postgres
+      - redis
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  # ─── Listings Updater ────────────────────────────────────────────────────────
+  # Scraper Zillow: roda, dorme 10min, roda de novo
+  listings-updater:
+    image: ghcr.io/justgu1/hericarealtor-listings-updater:${HERICAREALTOR_TAG:-latest}
+    environment:
+      DATABASE_URL: postgresql://${HERICAREALTOR_DB_USER}:${HERICAREALTOR_DB_PASSWORD}@hericarealtor_postgres:5432/${HERICAREALTOR_DB_NAME}
+      ZILLOW_ENCODED_ZUID: ${ZILLOW_ENCODED_ZUID}
+      ZILLOW_PROFILE_SLUG: ${ZILLOW_PROFILE_SLUG}
+      USE_VIRTUAL_DISPLAY: "true"
+      LARAVEL_API_URL: ${URL_HERICAREALTOR}
+      LARAVEL_INTERNAL_TOKEN: ${HERICAREALTOR_INTERNAL_TOKEN}
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_LISTINGS_RESULT}
+      TZ: America/Sao_Paulo
+    networks:
+      - proxy
+      - internal
+    depends_on:
+      - postgres
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 30s
+
+volumes:
+  hericarealtor_postgres:
+  hericarealtor_redis:
+
+networks:
+  proxy:
+    external: true
+  internal:
+    external: true

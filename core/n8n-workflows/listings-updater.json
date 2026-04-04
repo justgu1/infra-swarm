@@ -1,0 +1,167 @@
+{
+  "name": "listings-updater",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 10 }] }
+      },
+      "id": "schedule-trigger",
+      "name": "Cada 10 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://listings_updater:8001/run",
+        "options": { "timeout": 10000 }
+      },
+      "id": "trigger-scraper",
+      "name": "Disparar scraper",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "started",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check-started",
+      "name": "Já rodando?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.WEBHOOK_URL }}/send-message",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "message", "value": "⚠️ listings-updater já está rodando — pulando ciclo" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-skip",
+      "name": "Log: já rodando",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 440],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "listings-result",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-result",
+      "name": "Receber resultado",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 520],
+      "webhookId": "listings-result"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.success }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check-success",
+      "name": "Sucesso?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 520]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $input.first().json.body;\nconst results = b.results || {};\nconst lines = [\n  `✅ listings-updater concluído`,\n  `⏱ Duração: ${b.duration_s}s`,\n  `📦 For sale: ${results.for_sale ?? 0} novos`,\n  `🏠 For rent: ${results.for_rent ?? 0} novos`,\n  `💰 Sold: ${results.sold ?? 0} novos`,\n  `📸 Detalhes: ${results.details_fetched ?? 0} páginas`,\n];\nreturn [{ json: { message: lines.join('\\n'), ...b } }];"
+      },
+      "id": "format-success",
+      "name": "Formatar sucesso",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 440]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $input.first().json.body;\nreturn [{ json: {\n  message: `❌ listings-updater FALHOU\\nErro: ${b.error}\\nDuração: ${b.duration_s}s`,\n  ...b\n} }];"
+      },
+      "id": "format-error",
+      "name": "Formatar erro",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 600]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": { "__rl": true, "mode": "id", "value": "" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "execucoes" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "service": "listings-updater",
+            "started_at": "={{ $json.started_at }}",
+            "finished_at": "={{ $json.finished_at }}",
+            "duration_s": "={{ $json.duration_s }}",
+            "success": "={{ $json.success }}",
+            "for_sale": "={{ $json.results?.for_sale ?? 0 }}",
+            "for_rent": "={{ $json.results?.for_rent ?? 0 }}",
+            "sold": "={{ $json.results?.sold ?? 0 }}",
+            "error": "={{ $json.error ?? '' }}"
+          }
+        }
+      },
+      "id": "log-sheet",
+      "name": "Registrar no Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [900, 520],
+      "disabled": true,
+      "notes": "Opcional: configure credentials e document ID"
+    }
+  ],
+  "connections": {
+    "Cada 10 minutos": { "main": [[{ "node": "Disparar scraper", "type": "main", "index": 0 }]] },
+    "Disparar scraper": { "main": [[{ "node": "Já rodando?", "type": "main", "index": 0 }]] },
+    "Já rodando?": {
+      "main": [
+        [{ "node": "Log: já rodando", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Receber resultado": { "main": [[{ "node": "Sucesso?", "type": "main", "index": 0 }]] },
+    "Sucesso?": {
+      "main": [
+        [{ "node": "Formatar sucesso", "type": "main", "index": 0 }],
+        [{ "node": "Formatar erro", "type": "main", "index": 0 }]
+      ]
+    },
+    "Formatar sucesso": { "main": [[{ "node": "Registrar no Sheets", "type": "main", "index": 0 }]] },
+    "Formatar erro": { "main": [[{ "node": "Registrar no Sheets", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "infra" }, { "name": "hericarealtor" }]
+}

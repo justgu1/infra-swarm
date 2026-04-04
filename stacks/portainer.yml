@@ -1,0 +1,30 @@
+version: '3.8'
+
+# Stack: portainer
+# Serviços: Portainer CE (admin Docker Swarm)
+# Deploy: docker stack deploy -c stacks/portainer.yml portainer
+
+services:
+  portainer:
+    image: portainer/portainer-ce:latest
+    command: -H unix:///var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    networks:
+      - proxy
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+
+volumes:
+  portainer_data:
+
+networks:
+  proxy:
+    external: true

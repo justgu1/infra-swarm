@@ -1,0 +1,56 @@
+version: '3.8'
+
+# Stack: automation
+# Serviços: n8n (automações, webhooks, integrações)
+# Deploy: docker stack deploy -c stacks/automation.yml automation
+
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    environment:
+      # Acesso
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+
+      # URLs
+      N8N_HOST: ${URL_N8N}
+      N8N_PORT: 5678
+      N8N_PROTOCOL: https
+      WEBHOOK_URL: ${URL_N8N}
+
+      # SMTP
+      N8N_EMAIL_MODE: smtp
+      N8N_SMTP_HOST: ${SMTP_HOST}
+      N8N_SMTP_PORT: ${SMTP_PORT}
+      N8N_SMTP_SSL: "true"
+      N8N_SMTP_USER: ${SMTP_USER}
+      N8N_SMTP_PASS: ${SMTP_PASSWORD}
+      N8N_SMTP_SENDER: ${SMTP_USER}
+
+      # Timezone
+      GENERIC_TIMEZONE: America/Sao_Paulo
+      TZ: America/Sao_Paulo
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - proxy
+      - internal
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+
+volumes:
+  n8n_data:
+
+networks:
+  proxy:
+    external: true
+  internal:
+    external: true
