@@ -7,7 +7,7 @@
 
 set -euo pipefail
 
-DEPLOY_PATH="/opt/justgu1"
+DEPLOY_PATH="/opt/infra"
 
 # Carregar variáveis
 source "$DEPLOY_PATH/.env"
