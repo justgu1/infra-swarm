@@ -55,6 +55,9 @@ services:
       LARAVEL_INTERNAL_TOKEN: ${HERICAREALTOR_INTERNAL_TOKEN}
       N8N_INTERNAL_TOKEN: ${HERICAREALTOR_INTERNAL_TOKEN}
 
+      # Google Maps
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+
       TZ: America/Sao_Paulo
     networks:
       - proxy
