@@ -53,6 +53,7 @@ services:
 
       # Internal API token (listings-updater)
       LARAVEL_INTERNAL_TOKEN: ${HERICAREALTOR_INTERNAL_TOKEN}
+      N8N_INTERNAL_TOKEN: ${HERICAREALTOR_INTERNAL_TOKEN}
 
       TZ: America/Sao_Paulo
     networks:
