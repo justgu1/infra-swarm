@@ -21,6 +21,8 @@ DOMAINS=(
   "minio.justgui.dev"
   "minio-console.justgui.dev"
   "support.justgui.dev"
+  "homolog.tyershop.com"
+  "www.homolog.tyershop.com"
   "suporte.tyershop.com"
   "evolution.justgui.dev"
   "portainer.justgui.dev"

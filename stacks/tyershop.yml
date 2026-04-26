@@ -1,0 +1,141 @@
+version: '3.8'
+
+# Stack: tyershop
+# Serviços: Medusa backend + Astro frontend + API + PostgreSQL + Redis
+# Deploy: docker stack deploy -c stacks/tyershop.yml tyershop
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${TYERSHOP_DB_NAME}
+      POSTGRES_USER: ${TYERSHOP_DB_USER}
+      POSTGRES_PASSWORD_FILE: /run/secrets/tyershop_db_password
+    volumes:
+      - tyershop_postgres:/var/lib/postgresql/data
+    networks:
+      - internal
+    secrets:
+      - tyershop_db_password
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+  redis:
+    image: redis:7-alpine
+    command: >
+      sh -c "redis-server --appendonly yes --requirepass \"$$(cat /run/secrets/tyershop_redis_password)\""
+    volumes:
+      - tyershop_redis:/data
+    networks:
+      - internal
+    secrets:
+      - tyershop_redis_password
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  backend:
+    image: ghcr.io/justgu1/tyershop-backend:${TYERSHOP_BACKEND_TAG:-latest}
+    command: >
+      sh -c "export DATABASE_URL=postgres://${TYERSHOP_DB_USER}:$$(cat /run/secrets/tyershop_db_password)@tyershop_postgres:5432/${TYERSHOP_DB_NAME} &&
+             export REDIS_URL=redis://:$$(cat /run/secrets/tyershop_redis_password)@tyershop_redis:6379 &&
+             export JWT_SECRET=$$(cat /run/secrets/tyershop_jwt_secret) &&
+             export COOKIE_SECRET=$$(cat /run/secrets/tyershop_cookie_secret) &&
+             export AWS_SECRET_ACCESS_KEY=$$(cat /run/secrets/tyershop_aws_secret_access_key) &&
+             npm run start"
+    environment:
+      FILESYSTEM_DISK: s3
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_BUCKET: ${TYERSHOP_S3_BUCKET}
+      AWS_ENDPOINT: ${URL_MINIO}
+      AWS_USE_PATH_STYLE_ENDPOINT: "true"
+      AWS_URL: ${URL_MINIO}/${TYERSHOP_S3_BUCKET}
+      TZ: America/Sao_Paulo
+    networks:
+      - proxy
+      - internal
+    secrets:
+      - tyershop_db_password
+      - tyershop_redis_password
+      - tyershop_jwt_secret
+      - tyershop_cookie_secret
+      - tyershop_aws_secret_access_key
+    depends_on:
+      - postgres
+      - redis
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  frontend:
+    image: ghcr.io/justgu1/tyershop-frontend:${TYERSHOP_FRONTEND_TAG:-latest}
+    environment:
+      PUBLIC_MEDUSA_URL: ${URL_TYERSHOP}
+      PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${TYERSHOP_PUBLIC_PUBLISHABLE_KEY}
+      MEDUSA_INTERNAL_URL: http://tyershop_backend:9000
+      TZ: America/Sao_Paulo
+    networks:
+      - proxy
+      - internal
+    depends_on:
+      - backend
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  api:
+    image: ghcr.io/justgu1/tyershop-api:${TYERSHOP_API_TAG:-latest}
+    command: >
+      sh -c "export MERCADOPAGO_ACCESS_TOKEN=$$(cat /run/secrets/tyershop_mercadopago_access_token) &&
+             node index.js"
+    environment:
+      MEDUSA_URL: http://tyershop_backend:9000
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      NEWSLETTER_FROM: ${TYERSHOP_NEWSLETTER_FROM}
+      NEWSLETTER_TO: ${TYERSHOP_NEWSLETTER_TO}
+      TZ: America/Sao_Paulo
+    networks:
+      - proxy
+      - internal
+    secrets:
+      - tyershop_mercadopago_access_token
+    depends_on:
+      - backend
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+volumes:
+  tyershop_postgres:
+  tyershop_redis:
+
+networks:
+  proxy:
+    external: true
+  internal:
+    external: true
+
+secrets:
+  tyershop_db_password:
+    external: true
+  tyershop_redis_password:
+    external: true
+  tyershop_jwt_secret:
+    external: true
+  tyershop_cookie_secret:
+    external: true
+  tyershop_mercadopago_access_token:
+    external: true
+  tyershop_aws_secret_access_key:
+    external: true

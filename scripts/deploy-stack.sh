@@ -13,7 +13,7 @@ INFRA_DIR="$(dirname "$SCRIPT_DIR")"
 source "$INFRA_DIR/.env"
 export $(grep -v '^#' "$INFRA_DIR/.env" | xargs)
 
-ALL_STACKS=(core portainer storage automation comms hericarealtor justgui)
+ALL_STACKS=(core portainer storage automation comms hericarealtor tyershop justgui)
 
 deploy_stack() {
   local name="$1"

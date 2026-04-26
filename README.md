@@ -9,6 +9,7 @@ Infraestrutura Docker Swarm para os projetos justgu1. Um único repo que central
 | Projeto | Descrição | Stack |
 |---|---|---|
 | **hericarealtor** | Plataforma imobiliária — Laravel + scraper de listagens | `hericarealtor` |
+| **tyershop** | E-commerce — Medusa + Astro + API Node | `tyershop` |
 | **justgui.dev** | Site pessoal/portfólio — Go API + Astro | `justgui` |
 
 ### Serviços de suporte
@@ -45,6 +46,7 @@ infra/
 │   ├── automation.yml          ← n8n
 │   ├── comms.yml               ← Chatwoot + Evolution API
 │   ├── hericarealtor.yml       ← Laravel PHP-FPM + PostgreSQL + Redis
+│   ├── tyershop.yml            ← Medusa + Astro + API + PostgreSQL + Redis
 │   └── justgui.yml             ← Go API + Astro
 ├── scripts/
 │   ├── bootstrap-vps.sh        ← passo 1: prepara a VPS do zero
@@ -121,7 +123,7 @@ O script:
 bash scripts/deploy-stack.sh
 ```
 
-Ordem de deploy: `core → portainer → storage → automation → comms → hericarealtor → justgui`
+Ordem de deploy: `core → portainer → storage → automation → comms → hericarealtor → tyershop → justgui`
 
 ---
 
@@ -133,6 +135,7 @@ bash scripts/deploy-stack.sh storage
 bash scripts/deploy-stack.sh automation
 bash scripts/deploy-stack.sh comms
 bash scripts/deploy-stack.sh hericarealtor
+bash scripts/deploy-stack.sh tyershop
 bash scripts/deploy-stack.sh justgui
 ```
 
@@ -222,6 +225,7 @@ Para tornar permanente, ajuste `deploy.replicas` no stack `.yml` e faça redeplo
 
 - **`.env` nunca vai ao git** — está no `.gitignore`. Use `.env.example` com placeholders.
 - **Segredos em produção** gerenciados exclusivamente via `.env` no servidor, fora do repositório.
+- **Docker secrets**: o stack `tyershop` usa secrets externos do Swarm para credenciais críticas.
 - **Firewall (UFW)** habilitado pelo bootstrap: apenas portas 22, 80 e 443 abertas.
 - **SSL automático** via Certbot/Let's Encrypt com renovação a cada 12h.
 - **Redes internas** (`internal`) isolam bancos de dados e Redis — nunca expostos ao `proxy`.
@@ -236,5 +240,6 @@ Os repos de aplicação são clonados manualmente na pasta `apps/` (gitignored):
 
 ```bash
 git clone git@github.com:justgu1/hericarealtor.git apps/hericarealtor
+git clone git@github.com:justgu1/tyershop.git      apps/tyershop
 git clone git@github.com:justgu1/justgui.dev.git   apps/justgui
 ```
