@@ -53,6 +53,22 @@ create_secret() {
   echo "✓ Criado secret: $swarm_name"
 }
 
+# O stack exige este secret; sem MERCADOPAGO_ACCESS_TOKEN no .env usamos placeholder (API sobe; checkout MP falha até configurares).
+create_mercadopago_secret() {
+  local value
+  value=$(trim "${MERCADOPAGO_ACCESS_TOKEN:-}")
+  if [ -z "$value" ]; then
+    value="__MERCADOPAGO_TOKEN_UNSET__"
+    echo "ℹ️  MERCADOPAGO_ACCESS_TOKEN vazio → secret placeholder (define token real e recria o secret para ativar checkout)."
+  fi
+  if secret_exists tyershop_mercadopago_access_token; then
+    echo "⏭  tyershop_mercadopago_access_token já existe — mantido. Para token novo: docker stack rm tyershop && docker secret rm tyershop_mercadopago_access_token && reexecutar este script."
+    return 0
+  fi
+  printf '%s' "$value" | docker secret create tyershop_mercadopago_access_token -
+  echo "✓ Criado secret: tyershop_mercadopago_access_token"
+}
+
 AWS_SECRET_VALUE="${TYERSHOP_AWS_SECRET_ACCESS_KEY:-${MINIO_ROOT_PASSWORD:-}}"
 
 echo "======================================"
@@ -63,7 +79,7 @@ create_secret tyershop_db_password "${TYERSHOP_DB_PASSWORD:-}"
 create_secret tyershop_redis_password "${TYERSHOP_REDIS_PASSWORD:-}"
 create_secret tyershop_jwt_secret "${TYERSHOP_JWT_SECRET:-}"
 create_secret tyershop_cookie_secret "${TYERSHOP_COOKIE_SECRET:-}"
-create_secret tyershop_mercadopago_access_token "${MERCADOPAGO_ACCESS_TOKEN:-}"
+create_mercadopago_secret
 create_secret tyershop_aws_secret_access_key "$AWS_SECRET_VALUE"
 
 echo ""
