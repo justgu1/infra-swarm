@@ -43,8 +43,8 @@ services:
   backend:
     image: ghcr.io/justgu1/tyershop-backend:${TYERSHOP_BACKEND_TAG:-latest}
     command: >
-      sh -c "export DATABASE_URL=postgres://${TYERSHOP_DB_USER}:$$(cat /run/secrets/tyershop_db_password)@tyershop_postgres:5432/${TYERSHOP_DB_NAME} &&
-             export REDIS_URL=redis://:$$(cat /run/secrets/tyershop_redis_password)@tyershop_redis:6379 &&
+      sh -c "export DATABASE_URL=postgres://${TYERSHOP_DB_USER}:$$(cat /run/secrets/tyershop_db_password)@postgres:5432/${TYERSHOP_DB_NAME} &&
+             export REDIS_URL=redis://:$$(cat /run/secrets/tyershop_redis_password)@redis:6379 &&
              export JWT_SECRET=$$(cat /run/secrets/tyershop_jwt_secret) &&
              export COOKIE_SECRET=$$(cat /run/secrets/tyershop_cookie_secret) &&
              export AWS_SECRET_ACCESS_KEY=$$(cat /run/secrets/tyershop_aws_secret_access_key) &&
@@ -80,7 +80,7 @@ services:
     environment:
       PUBLIC_MEDUSA_URL: ${URL_TYERSHOP}
       PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${TYERSHOP_PUBLIC_PUBLISHABLE_KEY}
-      MEDUSA_INTERNAL_URL: http://tyershop_backend:9000
+      MEDUSA_INTERNAL_URL: http://backend:9000
       TZ: America/Sao_Paulo
     networks:
       - proxy
@@ -98,7 +98,7 @@ services:
       sh -c "export MERCADOPAGO_ACCESS_TOKEN=$$(cat /run/secrets/tyershop_mercadopago_access_token) &&
              node index.js"
     environment:
-      MEDUSA_URL: http://tyershop_backend:9000
+      MEDUSA_URL: http://backend:9000
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
       NEWSLETTER_FROM: ${TYERSHOP_NEWSLETTER_FROM}
