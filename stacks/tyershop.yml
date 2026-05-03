@@ -50,6 +50,9 @@ services:
              export AWS_SECRET_ACCESS_KEY=$$(cat /run/secrets/tyershop_aws_secret_access_key) &&
              npm run start"
     environment:
+      STORE_CORS: ${TYERSHOP_STORE_CORS}
+      ADMIN_CORS: ${TYERSHOP_ADMIN_CORS}
+      AUTH_CORS: ${TYERSHOP_AUTH_CORS}
       FILESYSTEM_DISK: s3
       AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
       AWS_DEFAULT_REGION: us-east-1

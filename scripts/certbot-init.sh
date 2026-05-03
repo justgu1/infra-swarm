@@ -23,6 +23,7 @@ DOMAINS=(
   "support.justgui.dev"
   "homolog.tyershop.com"
   "www.homolog.tyershop.com"
+  "admin.tyershop.com"
   "suporte.tyershop.com"
   "evolution.justgui.dev"
   "portainer.justgui.dev"
