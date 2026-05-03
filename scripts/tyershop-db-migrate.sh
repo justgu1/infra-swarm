@@ -34,13 +34,20 @@ fi
 ENC_PASS="$(python3 -c "import urllib.parse, os; print(urllib.parse.quote(os.environ.get('TYERSHOP_DB_PASSWORD',''), safe=''))")"
 export DATABASE_URL="postgres://${USER}:${ENC_PASS}@tyershop_postgres:5432/${NAME}"
 
+DOCKER_ENV=( -e "DATABASE_URL=$DATABASE_URL" -e NODE_ENV=production )
+# Mesmo host que o stack Swarm (tyershop_redis); evita o aviso "fake redis" nas migrações.
+if [ -n "${TYERSHOP_REDIS_PASSWORD:-}" ]; then
+  ENC_REDIS="$(TYERSHOP_REDIS_PASSWORD="$TYERSHOP_REDIS_PASSWORD" python3 -c "import urllib.parse, os; print(urllib.parse.quote(os.environ['TYERSHOP_REDIS_PASSWORD'], safe=''))")"
+  DOCKER_ENV+=( -e "REDIS_URL=redis://:${ENC_REDIS}@tyershop_redis:6379" )
+fi
+
 echo "======================================"
 echo " Medusa db:migrate ($IMAGE)"
 echo "======================================"
 
 docker run --rm \
   --network internal \
-  -e DATABASE_URL="$DATABASE_URL" \
+  "${DOCKER_ENV[@]}" \
   "$IMAGE" \
   npx medusa db:migrate
 

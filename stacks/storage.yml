@@ -45,9 +45,9 @@ services:
     entrypoint: >
       /bin/sh -c "
         echo 'Aguardando MinIO...';
-        for i in \$(seq 1 12); do
-          mc alias set local http://storage_minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD} && break;
-          echo 'Tentativa '$${i}' falhou, aguardando 10s...';
+        for i in $$(seq 1 12); do
+          mc alias set local http://storage_minio:9000 '${MINIO_ROOT_USER}' '${MINIO_ROOT_PASSWORD}' && break;
+          echo Tentativa $$i falhou, aguardando 10s...;
           sleep 10;
         done;
         mc mb --ignore-existing local/hericarealtor;
