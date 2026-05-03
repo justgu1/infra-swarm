@@ -147,6 +147,16 @@ bash scripts/tyershop-sync-secrets.sh
 bash scripts/deploy-stack.sh tyershop
 ```
 
+**Primeira base Postgres vazia (erros `relation "tax_provider" does not exist`, etc.):** as migrações Medusa ainda não correram. Com Postgres do stack no ar:
+
+```bash
+cd /opt/infra-swarm
+bash scripts/tyershop-db-migrate.sh
+bash scripts/deploy-stack.sh tyershop
+```
+
+Garante que `TYERSHOP_DB_PASSWORD` no `.env` coincide com o utilizador na base (e com o secret `tyershop_db_password`). O `docker secret inspect` **não devolve** a password em texto — não uses isso em `ALTER USER`; usa o valor do `.env` ou redefine password e volta a criar o secret.
+
 ---
 
 ## Ambiente local (desenvolvimento)
