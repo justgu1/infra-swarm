@@ -139,6 +139,14 @@ bash scripts/deploy-stack.sh tyershop
 bash scripts/deploy-stack.sh justgui
 ```
 
+**Tyershop (primeira vez na VPS):** com o `.env` preenchido, cria os secrets Swarm a partir dele e só depois faz deploy do stack:
+
+```bash
+cd /opt/infra-swarm
+bash scripts/tyershop-sync-secrets.sh
+bash scripts/deploy-stack.sh tyershop
+```
+
 ---
 
 ## Ambiente local (desenvolvimento)
@@ -229,7 +237,7 @@ Para tornar permanente, ajuste `deploy.replicas` no stack `.yml` e faça redeplo
 
 - **`.env` nunca vai ao git** — está no `.gitignore`. Use `.env.example` com placeholders.
 - **Segredos em produção** gerenciados exclusivamente via `.env` no servidor, fora do repositório.
-- **Docker secrets**: o stack `tyershop` usa secrets externos do Swarm para credenciais críticas.
+- **Docker secrets**: o stack `tyershop` usa secrets externos do Swarm; os valores vêm do `.env` no servidor via `bash scripts/tyershop-sync-secrets.sh` (só cria o que ainda não existe; ver cabeçalho do script para rotação).
 - **Firewall (UFW)** habilitado pelo bootstrap: apenas portas 22, 80 e 443 abertas.
 - **SSL automático** via Certbot/Let's Encrypt com renovação a cada 12h.
 - **Redes internas** (`internal`) isolam bancos de dados e Redis — nunca expostos ao `proxy`.
