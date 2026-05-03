@@ -50,6 +50,7 @@ services:
         mc mb --ignore-existing local/hericarealtor;
         mc mb --ignore-existing local/support;
         mc mb --ignore-existing local/tyershop-support;
+        mc mb --ignore-existing local/tyershop;
         mc mb --ignore-existing local/justgui;
         exit 0;
       "
@@ -417,6 +418,114 @@ services:
     networks:
       - proxy
 
+  # ─── TYERSHOP (Medusa + Astro + API — perfil tyershop) ─────────────────────
+  tyershop_postgres:
+    image: postgres:15-alpine
+    profiles: [tyershop]
+    environment:
+      POSTGRES_USER: ${TYERSHOP_DB_USER:-tyershop}
+      POSTGRES_PASSWORD: ${TYERSHOP_DB_PASSWORD:-tyershop123}
+      POSTGRES_DB: ${TYERSHOP_DB_NAME:-tyershop}
+    volumes:
+      - tyershop_postgres:/var/lib/postgresql/data
+    networks:
+      - internal
+
+  tyershop_redis:
+    image: redis:7-alpine
+    profiles: [tyershop]
+    command: redis-server --appendonly yes
+    volumes:
+      - tyershop_redis:/data
+    networks:
+      - internal
+
+  tyershop_backend:
+    profiles: [tyershop]
+    build:
+      context: ../../apps/tyershop
+      dockerfile: backend/Dockerfile
+      target: dev
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgres://${TYERSHOP_DB_USER:-tyershop}:${TYERSHOP_DB_PASSWORD:-tyershop123}@tyershop_postgres:5432/${TYERSHOP_DB_NAME:-tyershop}
+      REDIS_URL: redis://tyershop_redis:6379
+      JWT_SECRET: ${TYERSHOP_JWT_SECRET:-dev_tyershop_jwt_change_me}
+      COOKIE_SECRET: ${TYERSHOP_COOKIE_SECRET:-dev_tyershop_cookie_change_me}
+      STORE_CORS: ${URL_TYERSHOP:-http://tyershop.test},http://localhost:4321,http://127.0.0.1:4321
+      ADMIN_CORS: ${URL_TYERSHOP:-http://tyershop.test},http://localhost:4321,http://127.0.0.1:4321
+      AUTH_CORS: ${URL_TYERSHOP:-http://tyershop.test},http://localhost:4321,http://127.0.0.1:4321
+      FILESYSTEM_DISK: s3
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_BUCKET: ${TYERSHOP_S3_BUCKET:-tyershop}
+      AWS_ENDPOINT: http://minio:9000
+      AWS_USE_PATH_STYLE_ENDPOINT: "true"
+      AWS_URL: ${URL_MINIO}/${TYERSHOP_S3_BUCKET:-tyershop}
+    volumes:
+      - ../../apps/tyershop/backend:/app
+      - tyershop_backend_node_modules:/app/node_modules
+    depends_on:
+      - tyershop_postgres
+      - tyershop_redis
+      - minio
+    networks:
+      - proxy
+      - internal
+
+  tyershop_frontend:
+    profiles: [tyershop]
+    build:
+      context: ../../apps/tyershop
+      dockerfile: frontend/Dockerfile
+      target: dev
+    command:
+      [
+        "sh",
+        "-c",
+        "npm install --no-audit --no-fund --loglevel=error && npm install --no-audit --no-fund @astrojs/node@^10.0.6 && npm run dev -- --host 0.0.0.0",
+      ]
+    environment:
+      NPM_CONFIG_AUDIT: "false"
+      NPM_CONFIG_FUND: "false"
+      NPM_CONFIG_LOGLEVEL: "error"
+      PUBLIC_MEDUSA_URL: ${URL_TYERSHOP:-http://tyershop.test}
+      PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${TYERSHOP_PUBLIC_PUBLISHABLE_KEY:-pk_replace_me}
+      MEDUSA_INTERNAL_URL: http://tyershop_backend:9000
+    volumes:
+      - ../../apps/tyershop/frontend:/app
+      - tyershop_frontend_node_modules:/app/node_modules
+    depends_on:
+      - tyershop_backend
+    networks:
+      - proxy
+      - internal
+
+  tyershop_api:
+    profiles: [tyershop]
+    build:
+      context: ../../apps/tyershop
+      dockerfile: api/Dockerfile
+      target: dev
+    environment:
+      MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN:-}
+      MEDUSA_URL: http://tyershop_backend:9000
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      NEWSLETTER_FROM: ${TYERSHOP_NEWSLETTER_FROM:-news@tyershop.test}
+      NEWSLETTER_TO: ${TYERSHOP_NEWSLETTER_TO:-}
+      CORS_ORIGIN: ${URL_TYERSHOP:-http://tyershop.test}
+    volumes:
+      - ../../apps/tyershop/api:/app
+      - tyershop_api_node_modules:/app/node_modules
+    depends_on:
+      - tyershop_backend
+      - mailpit
+    networks:
+      - proxy
+      - internal
+
   # ─── MAILPIT (SMTP local catch-all) ─────────────────────────────────────────
   mailpit:
     image: axllent/mailpit:latest
@@ -434,6 +543,11 @@ volumes:
   hericarealtor_postgres:
   hericarealtor_redis:
   hericarealtor_node_modules:
+  tyershop_postgres:
+  tyershop_redis:
+  tyershop_backend_node_modules:
+  tyershop_frontend_node_modules:
+  tyershop_api_node_modules:
 
 networks:
   proxy:

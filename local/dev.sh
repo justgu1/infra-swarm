@@ -2,18 +2,33 @@
 # dev.sh
 # Gerencia o ambiente local de desenvolvimento
 # Uso:
-#   bash local/dev.sh up       → sobe tudo
-#   bash local/dev.sh down     → derruba tudo
-#   bash local/dev.sh restart  → reinicia tudo
-#   bash local/dev.sh logs     → acompanha logs
-#   bash local/dev.sh ps       → lista containers
+#   bash local/dev.sh up              → sobe stack base (sem perfis de app)
+#   bash local/dev.sh up tyershop     → sobe perfil tyershop (+ base já em execução)
+#   bash local/dev.sh down            → derruba tudo
+#   bash local/dev.sh restart         → reinicia stack base
+#   bash local/dev.sh logs [serviço] → acompanha logs
+#   bash local/dev.sh ps              → lista containers
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CMD=${1:-up}
+ARG2=${2:-}
 
 cd "$SCRIPT_DIR"
+
+if [ "$CMD" = "up" ] && [ -n "$ARG2" ]; then
+  case "$ARG2" in
+    tyershop | hericarealtor | justgui)
+      docker compose --env-file .env.local --profile "$ARG2" up -d
+      exit 0
+      ;;
+    *)
+      echo "Perfil desconhecido: $ARG2 (use: tyershop, hericarealtor, justgui)"
+      exit 1
+      ;;
+  esac
+fi
 
 case "$CMD" in
   up)
@@ -32,15 +47,10 @@ case "$CMD" in
     echo "  http://evolution.justgui.test"
     echo "  http://mail.justgui.test           (Mailpit)"
     echo ""
-    echo "  Apps (requer Dockerfile + imagem):"
+    echo "  Apps (clone em apps/ + perfil Docker):"
+    echo "  bash local/dev.sh up tyershop      → http://tyershop.test"
     echo "  bash local/dev.sh up hericarealtor → http://hericarealtor.test"
     echo "  bash local/dev.sh up justgui       → http://justgui.test"
-    ;;
-  up\ hericarealtor|up-hericarealtor)
-    docker compose --env-file .env.local --profile hericarealtor up -d
-    ;;
-  up\ justgui|up-justgui)
-    docker compose --env-file .env.local --profile justgui up -d
     ;;
   down)
     echo "→ Derrubando ambiente local..."
@@ -58,6 +68,7 @@ case "$CMD" in
     ;;
   *)
     echo "Uso: bash local/dev.sh [up|down|restart|logs|ps]"
+    echo "     bash local/dev.sh up tyershop"
     exit 1
     ;;
 esac

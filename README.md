@@ -154,6 +154,10 @@ cp .env.local.example .env.local  # ou edite o .env.local existente
 
 # 3. Subir o ambiente
 docker compose up -d
+
+# Tyershop (Medusa + Astro + API) — requer clone em apps/tyershop
+docker compose --env-file .env.local --profile tyershop up -d
+# ou: bash local/dev.sh up tyershop  → http://tyershop.test
 ```
 
 Domínios locais usam o sufixo `.test` e são resolvidos via `/etc/hosts`.
@@ -231,6 +235,14 @@ Para tornar permanente, ajuste `deploy.replicas` no stack `.yml` e faça redeplo
 - **Redes internas** (`internal`) isolam bancos de dados e Redis — nunca expostos ao `proxy`.
 - **Portainer** restrito por senha e acessível apenas via HTTPS.
 - Rotacione segredos periodicamente e nunca os compartilhe em issues, PRs ou logs.
+
+### Tyershop (dados e API)
+
+- **Checkout / Mercado Pago**: `MERCADOPAGO_ACCESS_TOKEN` só em variável de ambiente ou Docker secret; nunca no frontend.
+- **API Node (`tyershop_api`)**: com `CORS_ORIGIN` definido (ex.: `URL_TYERSHOP` em produção), só o storefront indicado pode chamar `/api/*`. Em dev local, sem `CORS_ORIGIN`, o modo permissivo do CORS permanece para facilitar testes.
+- **Medusa**: `JWT_SECRET` e `COOKIE_SECRET` obrigatórios fortes em produção; `STORE_CORS` / `AUTH_CORS` devem listar apenas os domínios reais da loja e do admin.
+- **Nginx local (`tyershop.test`)**: cabeçalhos `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, `Permissions-Policy` e rate limit em `/api/` (zona `tyershop_api`).
+- **Webhook MP** (`/api/webhook`): validar assinatura do provedor antes de alterar pedido; hoje o handler é esqueleto — tratar como pendência crítica antes de ir a produção.
 
 ---
 

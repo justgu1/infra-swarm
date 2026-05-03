@@ -11,6 +11,7 @@ MARKER_END="# justgu1 local dev — END"
 
 ENTRIES=(
   "127.0.0.1 hericarealtor.test"
+  "127.0.0.1 tyershop.test"
   "127.0.0.1 justgui.test"
   "127.0.0.1 n8n.justgui.test"
   "127.0.0.1 minio.justgui.test"
