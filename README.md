@@ -10,7 +10,7 @@ Infraestrutura Docker Swarm para os projetos justgu1. Um único repo que central
 |---|---|---|
 | **hericarealtor** | Plataforma imobiliária — Laravel + scraper de listagens | `hericarealtor` |
 | **tyershop** | E-commerce — Medusa + Astro + API Node | `tyershop` |
-| **justgui.dev** | Site pessoal/portfólio — Go API + Astro | `justgui` |
+| **justgui.dev** | Site pessoal/portfólio — Astro SSR | `justgui` |
 
 ### Serviços de suporte
 
@@ -47,7 +47,7 @@ infra/
 │   ├── comms.yml               ← Chatwoot + Evolution API
 │   ├── hericarealtor.yml       ← Laravel PHP-FPM + PostgreSQL + Redis
 │   ├── tyershop.yml            ← Medusa + Astro + API + PostgreSQL + Redis
-│   └── justgui.yml             ← Go API + Astro
+│   └── justgui.yml             ← Astro SSR
 ├── scripts/
 │   ├── bootstrap-vps.sh        ← passo 1: prepara a VPS do zero
 │   ├── certbot-init.sh         ← passo 2: emite certificados SSL
@@ -137,6 +137,27 @@ bash scripts/deploy-stack.sh comms
 bash scripts/deploy-stack.sh hericarealtor
 bash scripts/deploy-stack.sh tyershop
 bash scripts/deploy-stack.sh justgui
+```
+
+**justgui + tyershop homolog (primeira vez na VPS, infra já no ar):**
+
+```bash
+cd /opt/infra-swarm
+git pull
+nano .env   # JUSTGUI_TAG, TYERSHOP_*_TAG, URL_JUSTGUI, URL_TYERSHOP, SMTP/CONTACT_TO, etc.
+
+# GHCR (se imagens privadas)
+echo 'PAT_READ_PACKAGES' | docker login ghcr.io -u GITHUB_USER --password-stdin
+
+bash scripts/deploy-stack.sh core
+# Se faltarem certs homolog/justgui: bash scripts/certbot-init.sh && bash scripts/deploy-stack.sh core
+
+bash scripts/tyershop-sync-secrets.sh
+bash scripts/tyershop-db-migrate.sh
+bash scripts/deploy-stack.sh tyershop
+bash scripts/deploy-stack.sh justgui
+
+docker service ls | grep -E 'tyershop|justgui'
 ```
 
 **Tyershop (primeira vez na VPS):** com o `.env` preenchido, cria os secrets Swarm a partir dele e só depois faz deploy do stack:
