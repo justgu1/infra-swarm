@@ -158,6 +158,9 @@ bash scripts/deploy-stack.sh tyershop
 bash scripts/deploy-stack.sh justgui
 
 docker service ls | grep -E 'tyershop|justgui'
+
+# Atalho (mesmos passos):
+bash scripts/deploy-justgui-tyershop-first.sh
 ```
 
 **Tyershop (primeira vez na VPS):** com o `.env` preenchido, cria os secrets Swarm a partir dele e só depois faz deploy do stack:
