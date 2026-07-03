@@ -21,6 +21,9 @@ services:
       - ${DEPLOY_PATH}/core/nginx/conf.d:/etc/nginx/conf.d:ro
       - certbot_certs:/etc/letsencrypt:ro
       - certbot_www:/var/www/certbot:ro
+    # Recarrega a cada 6h para reler os certs renovados pelo certbot.
+    # Sem isto o nginx mantém o cert antigo em memória e o serve mesmo após a renovação em disco.
+    command: /bin/sh -c "while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g 'daemon off;'"
     networks:
       - proxy
     deploy:
